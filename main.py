@@ -66,6 +66,14 @@ def take_photo():
 
     return filepath
 
+# funcion principal
+def iniciar_aplicacion():
+    # Tomar la foto
+    # Obtener la ruta de la foto
+    # Request a la API de arduino para obtener la temperatura y ph
+    # Guardar en la bd la temperatura, ph, y la ruta de la foto
+    print("Corriendo la aplicación")
+
 # Configurar el programador de tareas para registro en bitacora
 scheduler = BackgroundScheduler()
 scheduler.add_job(print_hello_world, 'cron', hour=10, minute=44)  # Programa la tarea para las 12:00 PM todos los días
