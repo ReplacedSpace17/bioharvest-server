@@ -1,5 +1,19 @@
+-- Crear el usuario
+CREATE USER 'pythondb'@'localhost' IDENTIFIED BY 'Javier117';
+
+-- Otorgar permisos al usuario para la base de datos bioharvestdb
+GRANT ALL PRIVILEGES ON bioharvestdb.* TO 'pythondb'@'localhost';
+
+-- Aplicar los cambios
+FLUSH PRIVILEGES;
+
+-- Crear la base de datos
 CREATE DATABASE bioharvestdb;
+
+-- Usar la base de datos
 USE bioharvestdb;
+
+-- Crear la tabla bitacora
 CREATE TABLE bitacora (
     id INT AUTO_INCREMENT PRIMARY KEY,
     temperatura DOUBLE NOT NULL,       -- Temperatura de la muestra
@@ -13,6 +27,7 @@ CREATE TABLE bitacora (
     date DATETIME NOT NULL             -- Fecha y hora
 );
 
+-- Crear la tabla estimacion_densidad
 CREATE TABLE estimacion_densidad (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_bitacora INT NOT NULL,          -- ID relacionado con la tabla bitacora
