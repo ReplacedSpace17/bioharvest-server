@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import os
@@ -6,9 +8,22 @@ import cv2
 import pymysql  # Librería para conectar a MySQL
 import numpy as np
 import subprocess  # Para ejecutar comandos del sistema
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware  # Importar CORSMiddleware
+
 
 # Crear una instancia de la aplicación FastAPI
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite todos los orígenes (puedes especificar una lista de dominios si lo deseas)
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos HTTP
+    allow_headers=["*"],  # Permite todos los encabezados
+)
+
+# Montar el directorio donde se encuentra la carpeta dist
+app.mount("/static", StaticFiles(directory="panel/dist"), name="static")
 
 #Ip del arduino
 IP_ARDUINO = "192.1.168.12"
@@ -23,8 +38,8 @@ DB_CONFIG = {
 
 # Ruta de ejemplo
 @app.get("/")
-async def read_root():
-    return {"message": "¡Servidor HTTP en FastAPI funcionando correctamente!"}
+async def read_index():
+    return FileResponse("panel/dist/index.html")
 
 @app.get("/take_photo")
 async def take_photo_endpoint():
@@ -34,6 +49,84 @@ async def take_photo_endpoint():
     except RuntimeError as e:
         return {"error": str(e)}
 
+# Endpoint para probar el serveer
+@app.get("/test")
+async def test_status():
+    if scheduler.running:
+        return JSONResponse(content={"status": "El servidor está funcionando correctamente y el programador de tareas está activo."}, status_code=200)
+    else:
+        return JSONResponse(content={"status": "El servidor está funcionando, pero el programador de tareas no está activo."}, status_code=200)
+
+# Endpoint para obtener las estadisticas
+@app.get("/statistic")
+async def get_statistics():
+    try:
+        # Conectar a la base de datos
+        connection = pymysql.connect(**DB_CONFIG)
+        with connection.cursor() as cursor:
+            # Ejecutar la consulta SELECT
+            cursor.execute("SELECT * FROM bitacora")
+            # Obtener todos los resultados
+            rows = cursor.fetchall()
+            
+            # Preparar los resultados como una lista de diccionarios
+            columns = [desc[0] for desc in cursor.description]
+            results = [dict(zip(columns, row)) for row in rows]
+            
+            # Convertir objetos datetime a formato string
+            for result in results:
+                for key, value in result.items():
+                    if isinstance(value, datetime):
+                        result[key] = value.isoformat()  # Convierte el datetime a ISO 8601
+            
+            # Retornar los resultados en formato JSON
+            return JSONResponse(content={"statistics": results}, status_code=200)
+    except pymysql.MySQLError as e:
+        # Si ocurre un error, retorna un mensaje de error
+        return JSONResponse(content={"error": f"Error al acceder a la base de datos: {e}"}, status_code=500)
+    finally:
+        # Cerrar la conexión
+        connection.close()
+
+# Endpoint para obtener las fotos (photo_src y date)
+@app.get("/getPhotos")
+async def get_photos():
+    try:
+        # Conectar a la base de datos
+        connection = pymysql.connect(**DB_CONFIG)
+        with connection.cursor() as cursor:
+            # Ejecutar la consulta SELECT
+            cursor.execute("SELECT photo_src, date FROM bitacora")
+            # Obtener todos los resultados
+            rows = cursor.fetchall()
+
+            # Preparar los resultados como una lista de diccionarios
+            columns = [desc[0] for desc in cursor.description]
+            results = [dict(zip(columns, row)) for row in rows]
+            
+            # Convertir objetos datetime a formato string
+            for result in results:
+                result["date"] = result["date"].strftime('%Y-%m-%d %H:%M:%S')  # Formato de fecha
+
+            # Retornar los resultados en formato JSON
+            return JSONResponse(content={"photos": results}, status_code=200)
+    except pymysql.MySQLError as e:
+        # Si ocurre un error, retorna un mensaje de error
+        return JSONResponse(content={"error": f"Error al acceder a la base de datos: {e}"}, status_code=500)
+    finally:
+        # Cerrar la conexión
+        connection.close()
+
+@app.get("/view/{file_path:path}")
+async def view_image(file_path: str):
+    file_path_full = os.path.join(PHOTO_DIR, file_path)
+    print(f"Ruta completa: {file_path_full}")  # Esto te ayudará a verificar la ruta real
+    
+    if os.path.exists(file_path_full):
+        return FileResponse(file_path_full)
+    else:
+        return {"error": f"Archivo no encontrado: {file_path_full}"}
+
 # ------------------------------------------------------------------------------- Funciones
 
 # Función de ejemplo
@@ -42,7 +135,10 @@ def print_hello_world():
 
 # Directorio donde se guardarán las fotos
 PHOTO_DIR = "photos"
+# Servir archivos estáticos desde el directorio de fotos
+app.mount("/photos", StaticFiles(directory=PHOTO_DIR), name="photos")
 os.makedirs(PHOTO_DIR, exist_ok=True)
+
 
 def take_photo():
     # Inicializa la cámara (0 para la cámara por defecto)
@@ -81,7 +177,7 @@ def take_photo():
 
     return filepath
 
-def save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular):
+def save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular, lectura_id):
     """
     Inserta los datos en la tabla bitacora.
     """
@@ -89,11 +185,11 @@ def save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular):
         connection = pymysql.connect(**DB_CONFIG)
         with connection.cursor() as cursor:
             query = """
-                INSERT INTO bitacora (temperatura, ph, value_R, value_G, value_B, value_I, photo_src, densidad_celular, date)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO bitacora (temperatura, ph, value_R, value_G, value_B, value_I, photo_src, densidad_celular, date, lectura_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             now = datetime.now()        
-            cursor.execute(query, (temp, ph, r, g, b, i, filepath, densidad_celular, now))
+            cursor.execute(query, (temp, ph, r, g, b, i, filepath, densidad_celular, now, lectura_id))
             connection.commit()
             print(f"{datetime.now()} - Datos guardados en la base de datos.")
     except pymysql.MySQLError as e:
@@ -164,7 +260,7 @@ def backup_database():
         print(f"Error al crear el respaldo de la base de datos: {e}")
 
 # Función principal
-def iniciar_aplicacion():
+def iniciar_aplicacion(lectura_id):
     try:
         print("Corriendo la aplicación")
         # Toma la foto y obtiene la ruta del archivo
@@ -188,7 +284,7 @@ def iniciar_aplicacion():
 
 
         # Guarda los datos en la base de datos
-        save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular)
+        save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular, lectura_id)
         # Realiza un respaldo de la base de datos
         backup_database()
     except Exception as e:
@@ -196,7 +292,12 @@ def iniciar_aplicacion():
 
 # Configurar el programador de tareas para registro en bitacora
 scheduler = BackgroundScheduler()
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=15, minute=12)  # Programa la tarea a las 10:44 AM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=9, minute=56, args=[1])  # Programa la tarea a las 6:00 AM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=6, minute=00, args=[1])  # Programa la tarea a las 6:00 AM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=10, minute=00, args=[2])  # Programa la tarea a las 10:00 AM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=13, minute=00, args=[3])  # Programa la tarea a las 13:00 PM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=17, minute=00, args=[4])  # Programa la tarea a las 17:00 PM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=21, minute=00, args=[5])  # Programa la tarea a las 21:00 PM
 scheduler.start()
 
 # Cerrar el programador al apagar la aplicación
