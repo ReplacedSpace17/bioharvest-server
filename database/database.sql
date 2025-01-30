@@ -15,16 +15,18 @@ USE bioharvestdb;
 
 -- Crear la tabla bitacora
 CREATE TABLE bitacora (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    temperatura DOUBLE NOT NULL,       -- Temperatura de la muestra
-    ph DOUBLE NOT NULL,                -- Valor del pH
-    value_R DOUBLE NOT NULL,
-    value_G DOUBLE NOT NULL,
-    value_B DOUBLE NOT NULL,
-    value_I DOUBLE NOT NULL,
-    photo_src VARCHAR(255) NOT NULL,   -- Ruta de la foto
-    densidad_celular DOUBLE NOT NULL,  -- Densidad celular
-    date DATETIME NOT NULL             -- Fecha y hora
+    id INT AUTO_INCREMENT PRIMARY KEY,                      -- Identificador único
+    temperatura DOUBLE NOT NULL,                             -- Temperatura de la muestra
+    ph DOUBLE NOT NULL,                                      -- Valor del pH
+    value_R DOUBLE NOT NULL,                                 -- Valor del canal Rojo
+    value_G DOUBLE NOT NULL,                                 -- Valor del canal Verde
+    value_B DOUBLE NOT NULL,                                 -- Valor del canal Azul
+    value_I DOUBLE NOT NULL,                                 -- Valor del canal Infrarrojo
+    photo_src VARCHAR(255) NOT NULL,                          -- Ruta de la imagen de la muestra
+    densidad_celular DOUBLE NOT NULL,                        -- Densidad celular estimada
+    date DATETIME NOT NULL,                                  -- Fecha y hora de la medición
+    lectura_id INT NOT NULL,                                 -- Identificador de la lectura
+    nombre VARCHAR(255) DEFAULT NULL                          -- Nombre del cultivo o muestra (opcional)
 );
 
 -- Crear la tabla estimacion_densidad

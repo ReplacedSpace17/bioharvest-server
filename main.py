@@ -10,8 +10,11 @@ import numpy as np
 import subprocess  # Para ejecutar comandos del sistema
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware  # Importar CORSMiddleware
+import serial
+import json
+import time
 
-
+NombreExp = os.getenv('NAME_EXPERIMENT', 'NaN')
 # Crear una instancia de la aplicación FastAPI
 app = FastAPI()
 app.add_middleware(
@@ -25,8 +28,7 @@ app.add_middleware(
 # Montar el directorio donde se encuentra la carpeta dist
 app.mount("/static", StaticFiles(directory="panel/dist"), name="static")
 
-#Ip del arduino
-IP_ARDUINO = "192.1.168.12"
+
 
 # Configuración de la conexión a la base de datos
 DB_CONFIG = {
@@ -128,6 +130,40 @@ async def view_image(file_path: str):
         return {"error": f"Archivo no encontrado: {file_path_full}"}
 
 # ------------------------------------------------------------------------------- Funciones
+def obtener_datos_arduino():
+    # Obtener el puerto serie desde la variable de entorno ARDUINO_PORT
+    puerto_serie = os.getenv('ARDUINO_PORT', '/dev/ttyACM0')  # Si no está configurado, usa '/dev/ttyUSB0' por defecto
+    baudios = 9600  # Cambia esto por la tasa de baudios que utiliza tu Arduino
+
+    # Inicia la conexión serial
+    ser = serial.Serial(puerto_serie, baudios, timeout=1)  
+    time.sleep(3)  # Espera a que Arduino inicie
+
+    # Enviar el comando 'd' para solicitar datos
+    ser.write(b"d\n")
+
+    # Leer la respuesta de Arduino
+    respuesta = ser.readline().decode().strip()
+
+    # Intentamos convertir la respuesta a JSON (esto debería ser un objeto JSON como {"t": 19.05, "ph": 6.27})
+    try:
+        datos = json.loads(respuesta)
+        temperatura = datos.get('t', None)  # Obtener la temperatura 't' (si existe)
+        ph = datos.get('ph', None)  # Obtener el pH (si existe)
+        
+        # Imprimir los valores obtenidos
+        #print(f"Temperatura: {temperatura}°C, pH: {ph}")
+
+        # Regresar los valores
+        return temperatura, ph
+    
+    except json.JSONDecodeError:
+        print("Error al recibir datos de Arduino. La respuesta no es un JSON válido.")
+        return None, None
+
+    finally:
+        # Cerrar la conexión
+        ser.close()
 
 # Función de ejemplo
 def print_hello_world():
@@ -185,11 +221,11 @@ def save_to_database(temp, ph, r, g, b, i, filepath, densidad_celular, lectura_i
         connection = pymysql.connect(**DB_CONFIG)
         with connection.cursor() as cursor:
             query = """
-                INSERT INTO bitacora (temperatura, ph, value_R, value_G, value_B, value_I, photo_src, densidad_celular, date, lectura_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO bitacora (temperatura, ph, value_R, value_G, value_B, value_I, photo_src, densidad_celular, date, lectura_id, nombre)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             now = datetime.now()        
-            cursor.execute(query, (temp, ph, r, g, b, i, filepath, densidad_celular, now, lectura_id))
+            cursor.execute(query, (temp, ph, r, g, b, i, filepath, densidad_celular, now, lectura_id, NombreExp))
             connection.commit()
             print(f"{datetime.now()} - Datos guardados en la base de datos.")
     except pymysql.MySQLError as e:
@@ -269,10 +305,8 @@ def iniciar_aplicacion(lectura_id):
         red_avg, green_avg, blue_avg, intensity_avg = procesing_image(filepath)
 
         # Simula una lectura de temperatura y pH desde un sensor
-        #Request al arduino para obtener la temperatura y el ph
-        
-        temp = 25.3
-        ph = 7.4
+        temp, ph = obtener_datos_arduino()
+        print(f"Temperatura: {temp} °C, pH: {ph}")
         # Valores de los promedios de las bandas
         r=red_avg
         g=green_avg
@@ -292,12 +326,10 @@ def iniciar_aplicacion(lectura_id):
 
 # Configurar el programador de tareas para registro en bitacora
 scheduler = BackgroundScheduler()
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=9, minute=56, args=[1])  # Programa la tarea a las 6:00 AM
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=6, minute=00, args=[1])  # Programa la tarea a las 6:00 AM
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=10, minute=00, args=[2])  # Programa la tarea a las 10:00 AM
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=13, minute=00, args=[3])  # Programa la tarea a las 13:00 PM
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=17, minute=00, args=[4])  # Programa la tarea a las 17:00 PM
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=21, minute=00, args=[5])  # Programa la tarea a las 21:00 PM
+scheduler.add_job(iniciar_aplicacion, 'cron', hour=14, minute=12, args=[1])  # Programa la tarea a las 6:00 AM
+for hora in range(24):
+    scheduler.add_job(iniciar_aplicacion, 'cron', hour=hora, minute=42, args=[hora])
+
 scheduler.start()
 
 # Cerrar el programador al apagar la aplicación
