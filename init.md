@@ -16,7 +16,7 @@ pip freeze > requirements.txt
 
 # Agregar variable de env
 nano ~/.bashrc
-export ARDUINO_PORT=/dev/ttyUSB0
+export ARDUINO_PORT=/dev/ttyACM0
 export NAME_EXPERIMENT=Test
 source ~/.bashrc
 

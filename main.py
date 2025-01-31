@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import cv2
 import pymysql  # Librería para conectar a MySQL
@@ -137,7 +137,7 @@ def obtener_datos_arduino():
 
     # Inicia la conexión serial
     ser = serial.Serial(puerto_serie, baudios, timeout=1)  
-    time.sleep(3)  # Espera a que Arduino inicie
+    time.sleep(10)  # Espera a que Arduino inicie
 
     # Enviar el comando 'd' para solicitar datos
     ser.write(b"d\n")
@@ -326,7 +326,8 @@ def iniciar_aplicacion(lectura_id):
 
 # Configurar el programador de tareas para registro en bitacora
 scheduler = BackgroundScheduler()
-scheduler.add_job(iniciar_aplicacion, 'cron', hour=14, minute=12, args=[1])  # Programa la tarea a las 6:00 AM
+scheduler.add_job(iniciar_aplicacion, 'date', run_date=datetime.now() + timedelta(seconds=10), args=[1])
+
 for hora in range(24):
     scheduler.add_job(iniciar_aplicacion, 'cron', hour=hora, minute=42, args=[hora])
 
