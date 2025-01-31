@@ -14,6 +14,14 @@ import serial
 import json
 import time
 
+# Configuración de la conexión a la base de datos
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "pythondb",
+    "password": "Javier117",
+    "database": "bioharvestdb",
+}
+connection = pymysql.connect(**DB_CONFIG)
 NombreExp = os.getenv('NAME_EXPERIMENT', 'NaN')
 # Crear una instancia de la aplicación FastAPI
 app = FastAPI()
@@ -30,13 +38,7 @@ app.mount("/static", StaticFiles(directory="panel/dist"), name="static")
 
 
 
-# Configuración de la conexión a la base de datos
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "pythondb",
-    "password": "Javier117",
-    "database": "bioharvestdb",
-}
+
 
 # Ruta de ejemplo
 @app.get("/")
@@ -326,11 +328,10 @@ def iniciar_aplicacion(lectura_id):
 
 # Configurar el programador de tareas para registro en bitacora
 scheduler = BackgroundScheduler()
-scheduler.add_job(iniciar_aplicacion, 'date', run_date=datetime.now() + timedelta(seconds=10), args=[1])
+scheduler.add_job(iniciar_aplicacion, 'date', run_date=datetime.now() + timedelta(seconds=10), args=[0])
 
 for hora in range(24):
-    scheduler.add_job(iniciar_aplicacion, 'cron', hour=hora, minute=42, args=[hora])
-
+    scheduler.add_job(iniciar_aplicacion, 'cron', hour=hora, minute=00, args=[hora])
 scheduler.start()
 
 # Cerrar el programador al apagar la aplicación

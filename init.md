@@ -41,14 +41,16 @@ After=network.target
 [Service]
 User=rs17
 Group=rs17
-WorkingDirectory=/home/rs17/Documentos/Proyectos/MCC/bioharvest-fotobiorreactor-pc
-ExecStart=/home/rs17/miniconda3/envs/fastapi_env/bin/uvicorn bioharvest.main:app --host 0.0.0.0 --port 8000 --reload
+WorkingDirectory=/home/rs17/projects/bioharvest-server
+ExecStart=/home/rs17/miniconda3/envs/fastapi_env/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 Restart=always
 RestartSec=5s
 TimeoutSec=30
 LimitNOFILE=65535
 Environment="PATH=/home/rs17/miniconda3/envs/fastapi_env/bin:$PATH"
 Environment="PYTHONUNBUFFERED=1"
+Environment="NAME_EXPERIMENT=Test"  # Agregar aquí
+Environment="ARDUINO_PORT=/dev/ttyACM0"  # Si es necesario
 
 [Install]
 WantedBy=multi-user.target
