@@ -1,42 +1,33 @@
-import serial
-import time
-import json
-import os
+import cv2
 
-def obtener_datos_arduino():
-    # Obtener el puerto serie desde la variable de entorno ARDUINO_PORT
-    puerto_serie = os.getenv('ARDUINO_PORT', '/dev/ttyACM0')  # Si no está configurado, usa '/dev/ttyUSB0' por defecto
-    baudios = 9600  # Cambia esto por la tasa de baudios que utiliza tu Arduino
+# Intenta abrir la cámara (0 es la cámara por defecto)
+camera = cv2.VideoCapture(0)
 
-    # Inicia la conexión serial
-    ser = serial.Serial(puerto_serie, baudios, timeout=1)  
-    time.sleep(3)  # Espera a que Arduino inicie
+# Verifica si la cámara se abrió correctamente
+if not camera.isOpened():
+    print("Error: No se pudo acceder a la cámara.")
+    exit()
 
-    # Enviar el comando 'd' para solicitar datos
-    ser.write(b"d\n")
+print("Cámara abierta correctamente. Presiona 'q' para salir.")
 
-    # Leer la respuesta de Arduino
-    respuesta = ser.readline().decode().strip()
+# Bucle para capturar y mostrar video
+while True:
+    # Captura un fotograma
+    ret, frame = camera.read()
 
-    # Intentamos convertir la respuesta a JSON (esto debería ser un objeto JSON como {"t": 19.05, "ph": 6.27})
-    try:
-        datos = json.loads(respuesta)
-        temperatura = datos.get('t', None)  # Obtener la temperatura 't' (si existe)
-        ph = datos.get('ph', None)  # Obtener el pH (si existe)
-        
-        # Imprimir los valores obtenidos
-        print(f"Temperatura: {temperatura}°C, pH: {ph}")
+    # Si no se pudo capturar el fotograma, sal del bucle
+    if not ret:
+        print("Error: No se pudo capturar el fotograma.")
+        break
 
-        # Regresar los valores
-        return temperatura, ph
-    
-    except json.JSONDecodeError:
-        print("Error al recibir datos de Arduino. La respuesta no es un JSON válido.")
-        return None, None
+    # Muestra el fotograma en una ventana
+    cv2.imshow("Cámara", frame)
 
-    finally:
-        # Cerrar la conexión
-        ser.close()
+    # Espera 1 ms y verifica si se presionó la tecla 'q' para salir
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-# Ejemplo de uso de la función
-temperatura, ph = obtener_datos_arduino()
+# Libera la cámara y cierra la ventana
+camera.release()
+cv2.destroyAllWindows()
+print("Cámara liberada y ventana cerrada.")

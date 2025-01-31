@@ -185,8 +185,13 @@ def take_photo():
     if not camera.isOpened():
         raise RuntimeError("Error: No se pudo acceder a la cámara.")
 
-    # Captura un fotograma
-    ret, frame = camera.read()
+    # Intenta capturar un fotograma varias veces
+    ret = False
+    for _ in range(10):  # Intenta 10 veces
+        ret, frame = camera.read()
+        if ret:
+            break
+        time.sleep(0.1)  # Espera 100 ms antes de intentar de nuevo
 
     if not ret:
         camera.release()
